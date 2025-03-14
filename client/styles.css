@@ -452,3 +452,16 @@ header h1 {
     font-size: 0.8em;
     white-space: nowrap;
   }
+
+.form-info {
+    display: block;
+    font-size: 0.8em;
+    color: var(--text-color);
+    opacity: 0.7;
+    margin-top: 4px;
+}
+
+.form-info.warning {
+    color: var(--delete-button);
+    opacity: 0.9;
+}

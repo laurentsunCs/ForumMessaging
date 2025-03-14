@@ -11,6 +11,11 @@ const app = express();
 const CONFIG = {
   PORT: process.env.PORT || 3000,
   MAX_MESSAGES: process.env.MAX_MESSAGES || 10,
+  MAX_LENGTH: {
+    MESSAGE: 500,
+    PSEUDO: 20
+  },
+  REQUEST_LIMIT: '1mb', // Limite de taille des requêtes
   RATE_LIMITS: {
     POST: {
       windowMs: 60 * 1000, // 1 minute
@@ -61,7 +66,8 @@ const blockNonBrowser = (req, res, next) => {
 
 // Configuration des middlewares
 app.use(cors({ origin: "*" }));
-app.use(express.json());
+app.use(express.json({ limit: CONFIG.REQUEST_LIMIT }));
+app.use(express.urlencoded({ extended: true, limit: CONFIG.REQUEST_LIMIT }));
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -158,7 +164,17 @@ app.post('/msg/post', blockNonBrowser, postLimiter, sanitizeInput, async (req, r
       return res.status(400).json({ code: 0, error: "Message vide" });
     }
 
-    if (allMsgs.length > CONFIG.MAX_MESSAGES) {
+    if (message.length > CONFIG.MAX_LENGTH.MESSAGE) {
+      logWithTimestamp(`IP: ${ip} - Message trop long (${message.length} caractères) par ${pseudo}`, 'WARNING');
+      return res.status(400).json({ code: 0, error: `Message trop long (maximum ${CONFIG.MAX_LENGTH.MESSAGE} caractères)` });
+    }
+
+    if (pseudo.length > CONFIG.MAX_LENGTH.PSEUDO) {
+      logWithTimestamp(`IP: ${ip} - Pseudo trop long (${pseudo.length} caractères)`, 'WARNING');
+      return res.status(400).json({ code: 0, error: `Pseudo trop long (maximum ${CONFIG.MAX_LENGTH.PSEUDO} caractères)` });
+    }
+
+    if (allMsgs.length >= CONFIG.MAX_MESSAGES) {
       logWithTimestamp(`IP: ${ip} - Limite de messages atteinte (${CONFIG.MAX_MESSAGES})`, 'INFO');
       allMsgs.pop();
     }
