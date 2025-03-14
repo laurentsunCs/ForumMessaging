@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forum de Discussion</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Forum de Discussion</h1>
+            <div class="header-buttons">
+                <button id="refreshButton" class="refresh-button">
+                    <span class="refresh-icon">🔄</span>
+                </button>
+                <button id="themeToggle" class="theme-toggle">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+        
+        <main class="main-content">
+            <div class="messages-section">
+                <div class="messages-header">
+                    <h2>Messages</h2>
+                    <div class="message-counter">
+                        Total: <span id="messageCount">0</span> messages
+                    </div>
+                </div>
+                <div class="messages-container" id="messagesContainer">
+                    <!-- Les messages seront injectés ici dynamiquement -->
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Nouveau Message</h2>
+                <div class="message-form">
+                    <input type="text" id="pseudo" placeholder="Votre pseudo" maxlength="20">
+                    <textarea id="message" placeholder="Votre message..." maxlength="500"></textarea>
+                    <button id="sendButton">Envoyer</button>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html> 
