@@ -191,7 +191,7 @@ async function sendMessage(e) {
     });
 
     if (response.status === 429) {
-      showFeedback("Attendez 1 minute entre les messages", true);
+      showFeedback("Attendez 1 minute avant de poster un nouveau message", true);
       return;
     }
     if (!response.ok) {
