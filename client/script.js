@@ -147,52 +147,71 @@ function checkFields() {
   sendButton.disabled = !pseudo || !content || isSendCooldown;
 }
 
+// Fonction pour mettre à jour le texte du bouton avec le décompte
+function updateSendButtonText(seconds) {
+    if (seconds > 0) {
+        sendButton.textContent = `Attendre (${seconds}s)`;
+    } else {
+        sendButton.textContent = 'Envoyer';
+    }
+}
+
 // Fonction pour envoyer un message
 async function sendMessage(e) {
-  e.preventDefault();
+    e.preventDefault();
 
-  isSendCooldown = true;
-  checkFields();
-  setTimeout(() => {
-    isSendCooldown = false;
-    checkFields(); // Réactiver après 5s
-  }, 5000);
+    isSendCooldown = true;
+    let countdown = 5;
+    updateSendButtonText(countdown);
+    
+    // Démarrer le décompte
+    const countdownInterval = setInterval(() => {
+        countdown--;
+        updateSendButtonText(countdown);
+        if (countdown <= 0) {
+            clearInterval(countdownInterval);
+            isSendCooldown = false;
+            checkFields();
+        }
+    }, 1000);
 
-  const pseudo = pseudoInput.value.trim();
-  const content = messageInput.value.trim();
+    checkFields();
 
-  if (!pseudo || !content) {
-    showFeedback("Veuillez remplir tous les champs", true);
-    return;
-  }
+    const pseudo = pseudoInput.value.trim();
+    const content = messageInput.value.trim();
 
-  try {
-    const response = await fetch(`${API_URL}/msg/post`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: content, pseudo })
-    });
-
-    if (response.status === 429) {
-      showFeedback("Attendez 1 minute entre les messages", true);
-      return;
-    }
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Erreur serveur");
+    if (!pseudo || !content) {
+        showFeedback("Veuillez remplir tous les champs", true);
+        return;
     }
 
-    showFeedback("Message envoyé !");
-    messageInput.value = "";
-    userHasScrolled = false; // Réinitialiser le flag de défilement
-    await refreshMessages();
-  } catch (error) {
-    if (error.message.includes("429")) {
-      showFeedback("Limite de messages atteinte - Patientez", true);
-    } else {
-      showFeedback(error.message || "Échec de l'envoi", true);
+    try {
+        const response = await fetch(`${API_URL}/msg/post`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: content, pseudo })
+        });
+
+        if (response.status === 429) {
+            showFeedback("Attendez 1 minute entre les messages", true);
+            return;
+        }
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "Erreur serveur");
+        }
+
+        showFeedback("Message envoyé !");
+        messageInput.value = "";
+        userHasScrolled = false; // Réinitialiser le flag de défilement
+        await refreshMessages();
+    } catch (error) {
+        if (error.message.includes("429")) {
+            showFeedback("Limite de messages atteinte - Patientez", true);
+        } else {
+            showFeedback(error.message || "Échec de l'envoi", true);
+        }
     }
-  }
 }
 
 function updateDeleteButtons() {
