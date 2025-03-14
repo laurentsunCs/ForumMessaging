@@ -74,18 +74,43 @@ async function refreshMessages() {
   }
 }
 
-// Fonction pour créer un élément message
+
+function showFeedback(message, isError = false) {
+  const feedback = document.createElement('div');
+  feedback.className = `feedback ${isError ? 'error' : 'success'}`;
+  feedback.textContent = message;
+  
+  document.body.appendChild(feedback);
+  setTimeout(() => feedback.remove(), 3000);
+}
+
+
 function createMessageElement(message) {
   const messageDiv = document.createElement("div");
   messageDiv.className = "message";
-  messageDiv.innerHTML = `
-    <div class="message-header">
-      <span class="message-pseudo">${message.pseudo}</span>
-      <span class="message-date">${formatDate(message.date)}</span>
-    </div>
-    <div class="message-content">${message.msg}</div>
-    <button class="delete-button" onclick="deleteMessage(${message.id})">Supprimer</button>
-  `;
+  
+  const header = document.createElement("div");
+  header.className = "message-header";
+  
+  const pseudo = document.createElement("span");
+  pseudo.className = "message-pseudo";
+  pseudo.textContent = message.pseudo;
+  
+  const date = document.createElement("span");
+  date.className = "message-date";
+  date.textContent = formatDate(message.date);
+  
+  const content = document.createElement("div");
+  content.className = "message-content";
+  content.textContent = message.msg;
+  
+  const deleteBtn = document.createElement("button");
+  deleteBtn.className = "delete-button";
+  deleteBtn.textContent = "Supprimer";
+  deleteBtn.onclick = () => deleteMessage(message.id);
+  
+  header.append(pseudo, date);
+  messageDiv.append(header, content, deleteBtn);
   return messageDiv;
 }
 
@@ -116,57 +141,44 @@ async function sendMessage(e) {
   const content = messageInput.value.trim();
   
   if (!pseudo || !content) {
-    alert("Veuillez remplir tous les champs");
+    showFeedback("Veuillez remplir tous les champs", true);
     return;
   }
   
-  sendButton.disabled = true;
-  
   try {
-    const encodedMessage = encodeURIComponent(content);
-    const encodedPseudo = encodeURIComponent(pseudo);
-    const response = await fetch(`${API_URL}/msg/post/${encodedMessage}?pseudo=${encodedPseudo}`);
+    const response = await fetch(`${API_URL}/msg/post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: content, pseudo })
+    });
     
     if (!response.ok) {
-      console.warn('Serveur non disponible');
-      return;
+      const error = await response.json();
+      throw new Error(error.error || "Erreur serveur");
     }
     
-    const data = await response.json();
-    if (data.code === 1) {
-      messageInput.value = "";
-      await refreshMessages();
-      checkFields();
-    }
+    showFeedback("Message envoyé !");
+    messageInput.value = "";
+    await refreshMessages();
   } catch (error) {
-    console.warn("Serveur non disponible");
-  } finally {
-    if (!sendButton.disabled) {
-      checkFields();
-    }
+    showFeedback(error.message || "Échec de l'envoi", true);
   }
 }
 
 // Fonction pour supprimer un message
 async function deleteMessage(id) {
-  const deleteButton = event.target;
-  deleteButton.disabled = true;
-  
   try {
-    const response = await fetch(`${API_URL}/msg/del/${id}`);
+    const response = await fetch(`${API_URL}/msg/del/${id}`, { method: 'DELETE' });
+    
     if (!response.ok) {
-      console.warn('Serveur non disponible');
-      return;
+      const error = await response.json();
+      throw new Error(error.error || "Échec de la suppression");
     }
     
-    const data = await response.json();
-    if (data.code === 1) {
-      await refreshMessages();
-    }
+    await refreshMessages();
+    showFeedback("Message supprimé");
   } catch (error) {
-    console.warn("Serveur non disponible");
-  } finally {
-    deleteButton.disabled = false;
+    showFeedback(error.message || "Échec de la suppression", true);
   }
 }
 
