@@ -30,14 +30,33 @@ app.use(
 app.use(express.static(path.join(__dirname, "../client"))); // Servir les fichiers statiques
 
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // 100 requêtes/IP
+const postLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 5 requêtes/minute
+  message: {
+    code: 0,
+    error: "Trop de tentatives. Merci de patienter 1 minute."
+  },
+  skipSuccessfulRequests: true // Ne pas compter les requêtes réussies
 });
 
-app.use('/msg/', limiter);
+const deleteLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 5, // 2 requêtes max
+  keyGenerator: (req) => {
+    // Utilise l'IP + endpoint comme clé
+    return `${req.ip}_delete`; 
+  },
+  handler: (req, res) => {
+    res.status(429).json({ 
+      code: 0,
+      error: "Maximum 2 suppressions par minute autorisées" 
+    });
+  }
+});
+
 // Configuration
-const MAX_MESSAGES = process.env.MAX_MESSAGES || 100;
+const MAX_MESSAGES = process.env.MAX_MESSAGES || 10;
 let lastId = 2; // ID incrémental
 
 // Middleware de sanitization
@@ -73,7 +92,7 @@ let allMsgs = [
 ];
 
 // Routes modifiées
-app.post("/msg/post", sanitizeInput, (req, res) => {
+app.post('/msg/post', postLimiter, sanitizeInput, (req, res)  => {
   const { message, pseudo = "Anonyme" } = req.body;
 
   if (!message) return res.status(400).json({ code: 0, error: "Message vide" });
@@ -93,7 +112,7 @@ app.post("/msg/post", sanitizeInput, (req, res) => {
   res.json({ code: 1, message: "Message ajouté", id: newMsg.id });
 });
 
-app.delete("/msg/del/:id", (req, res) => {
+app.delete('/msg/del/:id', deleteLimiter, (req, res) => {
   const id = parseInt(req.params.id);
   const initialLength = allMsgs.length;
 

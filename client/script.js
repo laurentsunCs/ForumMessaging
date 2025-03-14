@@ -3,6 +3,9 @@ const API_URL = window.location.origin
 let messages = [];
 let autoRefreshInterval;
 let isRefreshing = false;
+let deleteCount = 0;
+let maxDeletes = 5;
+let isSendCooldown = false;
 
 // Éléments du DOM
 const messagesContainer = document.getElementById("messagesContainer");
@@ -41,41 +44,42 @@ function updateMessageCount() {
 
 // Fonction pour rafraîchir les messages
 async function refreshMessages() {
-    if (isRefreshing) return;
-    isRefreshing = true;
-    refreshButton.classList.add("loading");
-    
-    try {
-        const response = await fetch(`${API_URL}/msg/getAll`);
-        console.log("La réponse est : ", response);
-        if (!response.ok) {
-            console.warn('Serveur non disponible');
-            return;
-        }
-        
-        const newMessages = await response.json();
-        messages = (newMessages || []).sort((a, b) => 
-          new Date(b.date) - new Date(a.date)
-        );
-        
-        // Mettre à jour l'affichage
-        messagesContainer.innerHTML = '';
-        messages.forEach(message => {
-            const messageElement = createMessageElement(message);
-            messagesContainer.appendChild(messageElement);
-        });
-        
-        updateMessageCount();
-    } catch (error) {
-        console.log("L'erreur est : ", error);
-        console.warn("Serveur non disponible");
-        messages = [];
-        messagesContainer.innerHTML = '<div class="message-error">Serveur non disponible</div>';
-        updateMessageCount();
-    } finally {
-        refreshButton.classList.remove("loading");
-        isRefreshing = false;
+  if (isRefreshing) return;
+  isRefreshing = true;
+  refreshButton.classList.add("loading");
+
+  try {
+    const response = await fetch(`${API_URL}/msg/getAll`);
+    console.log("La réponse est : ", response);
+    if (!response.ok) {
+      console.warn('Serveur non disponible');
+      return;
     }
+
+    const newMessages = await response.json();
+    messages = (newMessages || []).sort((a, b) =>
+      new Date(b.date) - new Date(a.date)
+    );
+
+    // Mettre à jour l'affichage
+    messagesContainer.innerHTML = '';
+    messages.forEach(message => {
+      const messageElement = createMessageElement(message);
+      messagesContainer.appendChild(messageElement);
+    });
+
+    updateMessageCount();
+    updateDeleteButtons();
+  } catch (error) {
+    console.log("L'erreur est : ", error);
+    console.warn("Serveur non disponible");
+    messages = [];
+    messagesContainer.innerHTML = '<div class="message-error">Serveur non disponible</div>';
+    updateMessageCount();
+  } finally {
+    refreshButton.classList.remove("loading");
+    isRefreshing = false;
+  }
 }
 
 
@@ -83,7 +87,7 @@ function showFeedback(message, isError = false) {
   const feedback = document.createElement('div');
   feedback.className = `feedback ${isError ? 'error' : 'success'}`;
   feedback.textContent = message;
-  
+
   document.body.appendChild(feedback);
   setTimeout(() => feedback.remove(), 3000);
 }
@@ -98,27 +102,27 @@ function createMessageElement(message) {
 
   const header = document.createElement("div");
   header.className = "message-header";
-  
+
   const pseudo = document.createElement("span");
   pseudo.className = "message-pseudo";
   pseudo.textContent = message.pseudo;
-  
+
   const date = document.createElement("span");
   date.className = "message-date";
   date.textContent = formatDate(message.date);
-  
+
   const content = document.createElement("div");
   content.className = "message-content";
   content.textContent = message.msg;
-  
+
   const deleteBtn = document.createElement("button");
   deleteBtn.className = "delete-button";
   deleteBtn.textContent = "Supprimer";
   deleteBtn.onclick = () => deleteMessage(message.id);
-  
+
   header.append(pseudo, date);
   messageDiv.append(header, content, deleteBtn);
-  
+
   return messageDiv;
 }
 
@@ -138,58 +142,103 @@ function formatDate(dateString) {
 function checkFields() {
   const pseudo = pseudoInput.value.trim();
   const content = messageInput.value.trim();
-  sendButton.disabled = !pseudo || !content;
+
+  // Désactiver si champs vides OU cooldown actif
+  sendButton.disabled = !pseudo || !content || isSendCooldown;
 }
 
 // Fonction pour envoyer un message
 async function sendMessage(e) {
-    e.preventDefault();
-    
-    const pseudo = pseudoInput.value.trim();
-    const content = messageInput.value.trim();
-    
-    if (!pseudo || !content) {
-        showFeedback("Veuillez remplir tous les champs", true);
-        return;
+  e.preventDefault();
+
+  isSendCooldown = true;
+  checkFields();
+  setTimeout(() => {
+    isSendCooldown = false;
+    checkFields(); // Réactiver après 5s
+  }, 5000);
+
+  const pseudo = pseudoInput.value.trim();
+  const content = messageInput.value.trim();
+
+  if (!pseudo || !content) {
+    showFeedback("Veuillez remplir tous les champs", true);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/msg/post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: content, pseudo })
+    });
+
+    if (response.status === 429) {
+      showFeedback("Attendez 1 minute entre les messages", true);
+      return;
     }
-    
-    try {
-        const response = await fetch(`${API_URL}/msg/post`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: content, pseudo })
-        });
-        
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || "Erreur serveur");
-        }
-        
-        showFeedback("Message envoyé !");
-        messageInput.value = "";
-        userHasScrolled = false; // Réinitialiser le flag de défilement
-        await refreshMessages();
-    } catch (error) {
-        showFeedback(error.message || "Échec de l'envoi", true);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Erreur serveur");
     }
+
+    showFeedback("Message envoyé !");
+    messageInput.value = "";
+    userHasScrolled = false; // Réinitialiser le flag de défilement
+    await refreshMessages();
+  } catch (error) {
+    if (error.message.includes("429")) {
+      showFeedback("Limite de messages atteinte - Patientez", true);
+    } else {
+      showFeedback(error.message || "Échec de l'envoi", true);
+    }
+  }
 }
 
+function updateDeleteButtons() {
+  document.querySelectorAll('.delete-button').forEach(button => {
+    const remainingDeletes = maxDeletes - deleteCount;
+    button.disabled = deleteCount >= maxDeletes;
+    button.title = remainingDeletes > 0
+      ? `${remainingDeletes} suppression${remainingDeletes > 1 ? 's' : ''} restante${remainingDeletes > 1 ? 's' : ''} cette minute`
+      : 'Limite atteinte (5/min)';
+  });
+}
 // Fonction pour supprimer un message
 async function deleteMessage(id) {
   try {
-    const response = await fetch(`${API_URL}/msg/del/${id}`, { method: 'DELETE' });
-    
+    const response = await fetch(`${API_URL}/msg/del/${id}`, {
+      method: 'DELETE'
+    });
+
+    if (response.status === 429) {
+      showFeedback("Attendez 1 minute entre les suppressions", true);
+      return;
+    }
+
     if (!response.ok) {
       const error = await response.json();
       throw new Error(error.error || "Échec de la suppression");
     }
-    
+
+    deleteCount++;
+    setTimeout(() => {
+      deleteCount = Math.max(0, deleteCount - 1);
+      updateDeleteButtons();
+    }, 60000); // 60 secondes
+
     await refreshMessages();
     showFeedback("Message supprimé");
+    updateDeleteButtons(); // Mettre à jour immédiatement
+
   } catch (error) {
     showFeedback(error.message || "Échec de la suppression", true);
   }
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateDeleteButtons();
+});
 
 function startAutoRefresh() {
   stopAutoRefresh();

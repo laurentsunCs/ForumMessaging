@@ -325,6 +325,16 @@ header h1 {
     transform: none;
     box-shadow: none;
 }
+.message-form button:disabled {
+    background: #cccccc !important;
+    cursor: not-allowed;
+    position: relative;
+  }
+  
+  .message-form button:disabled::after {
+    content: " (5s)";
+    font-size: 0.8em;
+  }
 
 .message-form button:hover {
     transform: translateY(-2px);
@@ -415,4 +425,31 @@ header h1 {
   @keyframes slideIn {
     from { transform: translateX(100%); }
     to { transform: translateX(0); }
+  }
+  .delete-button {
+    transition: all 0.3s ease; /* Animation fluide */
+  }
+  
+  .delete-button[disabled] {
+    opacity: 0.5;
+    transform: scale(0.95);
+    filter: grayscale(100%);
+    position: relative;
+    opacity: 0.7;
+    background: #cccccc !important;
+    cursor: not-allowed;
+  }
+  
+  .delete-button[disabled]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--text-color);
+    color: var(--bg-color);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.8em;
+    white-space: nowrap;
   }
