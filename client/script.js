@@ -18,6 +18,18 @@ const refreshButton = document.getElementById("refreshButton");
 const refreshIcon = refreshButton.querySelector(".refresh-icon");
 const messageCount = document.getElementById("messageCount");
 
+// Éléments de configuration
+const maxPseudoLengthElement = document.getElementById("maxPseudoLength");
+const maxMessageLengthElement = document.getElementById("maxMessageLength");
+const postRateLimitElement = document.getElementById("postRateLimit");
+
+// Configuration par défaut
+let config = {
+  maxMessageLength: 500,
+  maxPseudoLength: 30,
+  postRateLimit: 10
+};
+
 // Gestion du thème
 function initTheme() {
   const savedTheme = localStorage.getItem("theme") || "light";
@@ -255,6 +267,7 @@ async function deleteMessage(id) {
 
 document.addEventListener('DOMContentLoaded', () => {
   updateDeleteButtons();
+  loadConfig();
 });
 
 function startAutoRefresh() {
@@ -282,3 +295,34 @@ initTheme();
 refreshMessages();
 startAutoRefresh();
 checkFields(); // Vérifier l'état initial des champs
+
+// Chargement de la configuration
+async function loadConfig() {
+  try {
+    const response = await fetch(`${API_URL}/config`);
+    if (!response.ok) throw new Error('Erreur de chargement de la configuration');
+    
+    const serverConfig = await response.json();
+    
+    // Mise à jour de la configuration locale
+    config = {
+      maxMessageLength: serverConfig.maxMessageLength || config.maxMessageLength,
+      maxPseudoLength: serverConfig.maxPseudoLength || config.maxPseudoLength,
+      postRateLimit: serverConfig.postRateLimit || config.postRateLimit
+    };
+    
+    // Mise à jour des éléments d'interface
+    maxPseudoLengthElement.textContent = config.maxPseudoLength;
+    maxMessageLengthElement.textContent = config.maxMessageLength;
+    postRateLimitElement.textContent = config.postRateLimit;
+    
+    // Mise à jour des attributs maxlength
+    pseudoInput.maxLength = config.maxPseudoLength;
+    messageInput.maxLength = config.maxMessageLength;
+
+    // Mise à jour de maxDeletes
+    maxDeletes = serverConfig.deleteRateLimit || 5;
+  } catch (error) {
+    console.error("Erreur lors du chargement de la configuration:", error);
+  }
+}

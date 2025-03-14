@@ -52,16 +52,16 @@
                 <form class="message-form" id="messageForm">
                     <div class="form-group">
                         <label for="pseudo">Pseudo</label>
-                        <input type="text" id="pseudo" name="pseudo" placeholder="Votre pseudo" maxlength="20" required
+                        <input type="text" id="pseudo" name="pseudo" placeholder="Votre pseudo" required
                             autocomplete="nickname" aria-required="true">
-                        <small class="form-info">Maximum 20 caractères</small>
+                        <small class="form-info">Maximum <span id="maxPseudoLength">20</span> caractères</small>
                     </div>
                     <div class="form-group">
                         <label for="message">Message</label>
-                        <textarea id="message" name="message" placeholder="Votre message..." maxlength="500" required
+                        <textarea id="message" name="message" placeholder="Votre message..." required
                             aria-required="true"></textarea>
-                        <small class="form-info">Maximum 500 caractères</small>
-                        <small class="form-info warning">Limite de 5 messages par minute</small>
+                        <small class="form-info">Maximum <span id="maxMessageLength">500</span> caractères</small>
+                        <small class="form-info warning">Limite de <span id="postRateLimit">5</span> messages par minute</small>
                     </div>
                     <button type="submit" id="sendButton" disabled>Envoyer</button>
                 </form>

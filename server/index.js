@@ -10,26 +10,39 @@ const app = express();
 // Configuration globale
 const CONFIG = {
   PORT: process.env.PORT || 3000,
-  MAX_MESSAGES: process.env.MAX_MESSAGES || 10,
+  MAX_MESSAGES: parseInt(process.env.MAX_MESSAGES) || 10,
   MAX_LENGTH: {
-    MESSAGE: 500,
-    PSEUDO: 20
+    MESSAGE: parseInt(process.env.MAX_MESSAGE_LENGTH) || 500,
+    PSEUDO: parseInt(process.env.MAX_PSEUDO_LENGTH) || 30
   },
-  REQUEST_LIMIT: '1mb', // Limite de taille des requêtes
+  REQUEST_LIMIT: process.env.REQUEST_SIZE_LIMIT || '1mb',
   RATE_LIMITS: {
     POST: {
       windowMs: 60 * 1000, // 1 minute
-      max: 5, // 5 requêtes/minute
+      max: parseInt(process.env.POST_RATE_LIMIT) || 10,
     },
     DELETE: {
-      windowMs: 60 * 1000,
-      max: 5,
+      windowMs: 60 * 1000, // 1 minute
+      max: parseInt(process.env.DELETE_RATE_LIMIT) || 5,
     }
   },
   SANITIZE_OPTIONS: {
     allowedTags: [], // Ne permet aucune balise HTML
     allowedAttributes: {}, // Ne permet aucun attribut
+  },
+  SPAM_PROTECTION: {
+    MIN_INTERVAL_BETWEEN_MESSAGES: 1000, // 1 seconde minimum entre les messages
+    MAX_SIMILAR_MESSAGES: 3, // Nombre maximum de messages similaires autorisés
+    SIMILARITY_THRESHOLD: 0.8, // Seuil de similarité pour détecter les messages similaires
+    MESSAGE_HISTORY_SIZE: 100 // Taille de l'historique pour la détection de spam
   }
+};
+
+// Structure pour stocker l'historique des messages récents pour la détection de spam
+const messageHistory = {
+  messages: [],
+  lastMessageTimes: new Map(), // Map IP -> timestamp du dernier message
+  similarityCount: new Map(), // Map contenu -> nombre d'occurrences
 };
 
 // Fonction de logging simplifiée
@@ -90,7 +103,65 @@ app.use((req, res, next) => {
   next();
 });
 
-// Rate limiters
+// Fonction pour vérifier la similarité entre deux chaînes
+function stringSimilarity(str1, str2) {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  if (longer.length === 0) return 1.0;
+  return (longer.length - editDistance(longer, shorter)) / longer.length;
+}
+
+// Fonction pour calculer la distance d'édition (Levenshtein)
+function editDistance(str1, str2) {
+  const m = str1.length;
+  const n = str2.length;
+  const dp = Array(m + 1).fill().map(() => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = str1[i - 1] === str2[j - 1] 
+        ? dp[i - 1][j - 1]
+        : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+// Fonction pour vérifier si un message est du spam
+function isSpam(message, ip) {
+  const now = Date.now();
+  
+  // Vérifier l'intervalle minimum entre les messages
+  const lastMessageTime = messageHistory.lastMessageTimes.get(ip) || 0;
+  if (now - lastMessageTime < CONFIG.SPAM_PROTECTION.MIN_INTERVAL_BETWEEN_MESSAGES) {
+    return "Messages trop rapprochés. Merci d'attendre un peu.";
+  }
+  
+  // Vérifier les messages similaires
+  let similarCount = 0;
+  for (const oldMessage of messageHistory.messages) {
+    if (stringSimilarity(message, oldMessage) > CONFIG.SPAM_PROTECTION.SIMILARITY_THRESHOLD) {
+      similarCount++;
+      if (similarCount >= CONFIG.SPAM_PROTECTION.MAX_SIMILAR_MESSAGES) {
+        return "Trop de messages similaires détectés.";
+      }
+    }
+  }
+  
+  // Mettre à jour l'historique
+  messageHistory.lastMessageTimes.set(ip, now);
+  messageHistory.messages.push(message);
+  if (messageHistory.messages.length > CONFIG.SPAM_PROTECTION.MESSAGE_HISTORY_SIZE) {
+    messageHistory.messages.shift();
+  }
+  
+  return false;
+}
+
+// Rate limiters améliorés
 const postLimiter = rateLimit({
   windowMs: CONFIG.RATE_LIMITS.POST.windowMs,
   max: CONFIG.RATE_LIMITS.POST.max,
@@ -98,8 +169,12 @@ const postLimiter = rateLimit({
     code: 0,
     error: "Trop de tentatives. Merci de patienter 1 minute."
   },
-  skipSuccessfulRequests: false, // Ne pas ignorer les requêtes réussies
-  keyGenerator: (req) => `${getClientIP(req)}_post` // Utiliser l'IP comme clé
+  skipSuccessfulRequests: false,
+  keyGenerator: (req) => {
+    const ip = getClientIP(req);
+    // Utiliser les trois premiers octets de l'adresse IP pour le rate limiting
+    return ip.split('.').slice(0, 3).join('.') + '_post';
+  }
 });
 
 const deleteLimiter = rateLimit({
@@ -154,6 +229,23 @@ let allMsgs = [
 ];
 
 // Routes avec gestion d'erreurs améliorée
+app.get('/config', (req, res) => {
+  try {
+    const clientConfig = {
+      maxMessages: CONFIG.MAX_MESSAGES,
+      maxMessageLength: CONFIG.MAX_LENGTH.MESSAGE,
+      maxPseudoLength: CONFIG.MAX_LENGTH.PSEUDO,
+      postRateLimit: CONFIG.RATE_LIMITS.POST.max,
+      deleteRateLimit: CONFIG.RATE_LIMITS.DELETE.max
+    };
+    res.json(clientConfig);
+  } catch (error) {
+    const ip = getClientIP(req);
+    logWithTimestamp(`IP: ${ip} - Erreur lors de la récupération de la configuration: ${error.message}`, 'ERROR');
+    res.status(500).json({ error: "Erreur lors de la récupération de la configuration" });
+  }
+});
+
 app.post('/msg/post', blockNonBrowser, postLimiter, sanitizeInput, async (req, res) => {
   try {
     const ip = getClientIP(req);
@@ -162,6 +254,13 @@ app.post('/msg/post', blockNonBrowser, postLimiter, sanitizeInput, async (req, r
     if (!message) {
       logWithTimestamp(`IP: ${ip} - Tentative d'envoi d'un message vide par ${pseudo}`, 'WARNING');
       return res.status(400).json({ code: 0, error: "Message vide" });
+    }
+
+    // Vérification anti-spam
+    const spamCheck = isSpam(message, ip);
+    if (spamCheck) {
+      logWithTimestamp(`IP: ${ip} - Tentative de spam détectée: ${spamCheck}`, 'WARNING');
+      return res.status(429).json({ code: 0, error: spamCheck });
     }
 
     if (message.length > CONFIG.MAX_LENGTH.MESSAGE) {
