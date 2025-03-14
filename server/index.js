@@ -3,7 +3,6 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 const port = process.env.PORT || 3000;
-const host = process.env.HOST || "localhost";
 
 // Configuration
 const MAX_MESSAGES = process.env.MAX_MESSAGES || 100;
@@ -112,6 +111,6 @@ app.get("/test/*", function (req, res) {
 });
 
 // Démarrage du serveur
-app.listen(port, host, () => {
-  console.log(`Serveur démarré sur http://${host}:${port}`);
+app.listen(port, () => {
+  console.log(`Serveur démarré sur le port ${port}`);
 });
