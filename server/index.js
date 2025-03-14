@@ -10,27 +10,11 @@ const port = process.env.PORT || 3000;
 // Ajouter en haut du fichier
 const path = require("path");
 
-// Configuration des logs
-const LOG_DIR = path.join(__dirname, 'logs');
-const ACCESS_LOG = path.join(LOG_DIR, 'access.log');
-const ERROR_LOG = path.join(LOG_DIR, 'error.log');
 
-// Créer le dossier de logs s'il n'existe pas
-if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR);
-}
-
-// Fonction de logging améliorée
-function logWithTimestamp(message, type = 'INFO', logFile = null) {
+// Fonction de logging simplifiée
+function logWithTimestamp(message, type = 'INFO') {
     const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [${type}] ${message}\n`;
-    console.log(logMessage.trim());
-    
-    if (logFile) {
-        fs.appendFile(logFile, logMessage, (err) => {
-            if (err) console.error('Erreur d\'écriture des logs:', err);
-        });
-    }
+    console.log(`[${timestamp}] [${type}] ${message}`);
 }
 
 // Fonction pour obtenir l'IP réelle du client
@@ -50,23 +34,22 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"], // À limiter en production
+        scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", "data:"],
       },
     },
-    crossOriginEmbedderPolicy: false, // Nécessaire pour certains cas CORS
+    crossOriginEmbedderPolicy: false,
   })
 );
 // Ajouter après app.use(express.json());
 app.use(express.static(path.join(__dirname, "../client"))); // Servir les fichiers statiques
 
-// Middleware de logging des requêtes avec IP détaillée
+// Middleware de logging des requêtes
 app.use((req, res, next) => {
     const ip = getClientIP(req);
     const userAgent = req.headers['user-agent'];
-    const logMessage = `IP: ${ip} - ${req.method} ${req.url} - User-Agent: ${userAgent}`;
-    logWithTimestamp(logMessage, 'ACCESS', ACCESS_LOG);
+    logWithTimestamp(`IP: ${ip} - ${req.method} ${req.url} - User-Agent: ${userAgent}`, 'ACCESS');
     next();
 });
 
@@ -137,12 +120,12 @@ app.post('/msg/post', postLimiter, sanitizeInput, (req, res) => {
     const { message, pseudo = "Anonyme" } = req.body;
 
     if (!message) {
-        logWithTimestamp(`IP: ${ip} - Tentative d'envoi d'un message vide par ${pseudo}`, 'WARNING', ERROR_LOG);
+        logWithTimestamp(`IP: ${ip} - Tentative d'envoi d'un message vide par ${pseudo}`, 'WARNING');
         return res.status(400).json({ code: 0, error: "Message vide" });
     }
 
     if (allMsgs.length > MAX_MESSAGES) {
-        logWithTimestamp(`IP: ${ip} - Limite de messages atteinte (${MAX_MESSAGES})`, 'INFO', ACCESS_LOG);
+        logWithTimestamp(`IP: ${ip} - Limite de messages atteinte (${MAX_MESSAGES})`, 'INFO');
         allMsgs.pop();
     }
 
@@ -154,7 +137,7 @@ app.post('/msg/post', postLimiter, sanitizeInput, (req, res) => {
     };
 
     allMsgs.unshift(newMsg);
-    logWithTimestamp(`IP: ${ip} - Nouveau message #${newMsg.id} créé par ${pseudo}`, 'SUCCESS', ACCESS_LOG);
+    logWithTimestamp(`IP: ${ip} - Nouveau message #${newMsg.id} créé par ${pseudo}`, 'SUCCESS');
     res.json({ code: 1, message: "Message ajouté", id: newMsg.id });
 });
 
@@ -163,31 +146,33 @@ app.delete('/msg/del/:id', deleteLimiter, (req, res) => {
     const id = parseInt(req.params.id);
     const initialLength = allMsgs.length;
     
-    logWithTimestamp(`IP: ${ip} - Tentative de suppression du message #${id}`, 'INFO', ACCESS_LOG);
+    logWithTimestamp(`IP: ${ip} - Tentative de suppression du message #${id}`, 'INFO');
 
     allMsgs = allMsgs.filter((msg) => msg.id !== id);
 
     if (allMsgs.length === initialLength) {
-        logWithTimestamp(`IP: ${ip} - Message #${id} non trouvé pour la suppression`, 'WARNING', ERROR_LOG);
+        logWithTimestamp(`IP: ${ip} - Message #${id} non trouvé pour la suppression`, 'WARNING');
         return res.status(404).json({ code: 0, error: "Message non trouvé" });
     }
 
-    logWithTimestamp(`IP: ${ip} - Message #${id} supprimé avec succès`, 'SUCCESS', ACCESS_LOG);
+    logWithTimestamp(`IP: ${ip} - Message #${id} supprimé avec succès`, 'SUCCESS');
     res.json({ code: 1 });
 });
 
 app.get("/msg/get/:id", (req, res) => {
+    const ip = getClientIP(req);
     const id = parseInt(req.params.id);
     if (isNaN(id) || id < 0 || id >= allMsgs.length) {
-        logWithTimestamp(`Tentative d'accès à un message invalide #${id}`, 'WARNING');
+        logWithTimestamp(`IP: ${ip} - Tentative d'accès à un message invalide #${id}`, 'WARNING');
         return res.json({ code: 0 });
     }
-    logWithTimestamp(`Message #${id} récupéré`, 'INFO');
+    logWithTimestamp(`IP: ${ip} - Message #${id} récupéré`, 'INFO');
     res.json({ code: 1, msg: allMsgs[id] });
 });
 
 app.get("/msg/getAll", (req, res) => {
-    logWithTimestamp(`Récupération de tous les messages (${allMsgs.length} messages)`, 'INFO');
+    const ip = getClientIP(req);
+    logWithTimestamp(`IP: ${ip} - Récupération de tous les messages (${allMsgs.length} messages)`, 'INFO');
     const sortedMessages = [...allMsgs].sort(
         (a, b) => new Date(b.date) - new Date(a.date)
     );
@@ -195,7 +180,8 @@ app.get("/msg/getAll", (req, res) => {
 });
 
 app.get("/msg/nber", (req, res) => {
-    logWithTimestamp(`Nombre de messages demandé: ${allMsgs.length}`, 'INFO');
+    const ip = getClientIP(req);
+    logWithTimestamp(`IP: ${ip} - Nombre de messages demandé: ${allMsgs.length}`, 'INFO');
     res.json(allMsgs.length);
 });
 
@@ -209,11 +195,10 @@ app.get("/test/*", function (req, res) {
   res.json({ msg: path });
 });
 
-// Middleware de logging des erreurs
+// Middleware de gestion des erreurs
 app.use((err, req, res, next) => {
     const ip = getClientIP(req);
-    const errorMessage = `IP: ${ip} - Erreur: ${err.message} - URL: ${req.url}`;
-    logWithTimestamp(errorMessage, 'ERROR', ERROR_LOG);
+    logWithTimestamp(`IP: ${ip} - Erreur: ${err.message} - URL: ${req.url}`, 'ERROR');
     res.status(500).json({ error: "Erreur serveur interne" });
 });
 
