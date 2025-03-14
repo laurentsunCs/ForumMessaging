@@ -1,23 +1,44 @@
 require("dotenv").config({ path: "../.env" });
 const express = require("express");
+const rateLimit = require('express-rate-limit');
 const cors = require("cors");
 const helmet = require("helmet");
 const sanitizeHtml = require("sanitize-html");
 const app = express();
 const port = process.env.PORT || 3000;
 // Ajouter en haut du fichier
-const path = require('path');
+const path = require("path");
 
-app.use(cors({ origin: '*' }));
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 app.use(helmet());
+// Après helmet(), ajouter :
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // À limiter en production
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:"],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Nécessaire pour certains cas CORS
+  })
+);
 // Ajouter après app.use(express.json());
-app.use(express.static(path.join(__dirname, '../client'))); // Servir les fichiers statiques
+app.use(express.static(path.join(__dirname, "../client"))); // Servir les fichiers statiques
 
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // 100 requêtes/IP
+});
+
+app.use('/msg/', limiter);
 // Configuration
 const MAX_MESSAGES = process.env.MAX_MESSAGES || 100;
 let lastId = 2; // ID incrémental
-
 
 // Middleware de sanitization
 const sanitizeInput = (req, res, next) => {
@@ -26,20 +47,38 @@ const sanitizeInput = (req, res, next) => {
   next();
 };
 
+
+
+
 // Messages initiaux
 let allMsgs = [
-  { id: 0, msg: "Hello World", pseudo: "System", date: new Date().toISOString() },
-  { id: 1, msg: "Bienvenue sur le forum !", pseudo: "Admin", date: new Date().toISOString() },
-  { id: 2, msg: "CentraleSupelec Forever", pseudo: "Étudiant", date: new Date().toISOString() },
+  {
+    id: 0,
+    msg: "Hello World",
+    pseudo: "System",
+    date: new Date().toISOString(),
+  },
+  {
+    id: 1,
+    msg: "Bienvenue sur le forum !",
+    pseudo: "Admin",
+    date: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    msg: "CentraleSupelec Forever",
+    pseudo: "Étudiant",
+    date: new Date().toISOString(),
+  },
 ];
 
 // Routes modifiées
 app.post("/msg/post", sanitizeInput, (req, res) => {
-  const { message, pseudo = 'Anonyme' } = req.body;
-  
+  const { message, pseudo = "Anonyme" } = req.body;
+
   if (!message) return res.status(400).json({ code: 0, error: "Message vide" });
 
-  if(allMsgs.length > MAX_MESSAGES) {
+  if (allMsgs.length > MAX_MESSAGES) {
     allMsgs.pop(); // Supprimer le plus ancien
   }
 
@@ -57,13 +96,13 @@ app.post("/msg/post", sanitizeInput, (req, res) => {
 app.delete("/msg/del/:id", (req, res) => {
   const id = parseInt(req.params.id);
   const initialLength = allMsgs.length;
-  
-  allMsgs = allMsgs.filter(msg => msg.id !== id);
-  
+
+  allMsgs = allMsgs.filter((msg) => msg.id !== id);
+
   if (allMsgs.length === initialLength) {
     return res.status(404).json({ code: 0, error: "Message non trouvé" });
   }
-  
+
   res.json({ code: 1 });
 });
 
@@ -79,10 +118,10 @@ app.get("/msg/get/:id", (req, res) => {
 // Route pour obtenir tous les messages
 app.get("/msg/getAll", (req, res) => {
   // Trier les messages par date décroissante
-  const sortedMessages = [...allMsgs].sort((a, b) => 
-    new Date(b.date) - new Date(a.date)
+  const sortedMessages = [...allMsgs].sort(
+    (a, b) => new Date(b.date) - new Date(a.date)
   );
-  
+
   res.json(sortedMessages);
 });
 
@@ -91,8 +130,8 @@ app.get("/msg/nber", (req, res) => {
   res.json(allMsgs.length);
 });
 
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/index.html'));
+app.get("*", (req, res) => {
+  res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 
 // Route de test
@@ -103,5 +142,7 @@ app.get("/test/*", function (req, res) {
 
 // Démarrage du serveur
 app.listen(port, () => {
-  console.log(`l'Application est démarrée sur le port ${port}, accéder à http://localhost:${port}`);
+  console.log(
+    `l'Application est démarrée sur le port ${port}, accéder à http://localhost:${port}`
+  );
 });
