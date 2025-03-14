@@ -4,16 +4,41 @@ const rateLimit = require('express-rate-limit');
 const cors = require("cors");
 const helmet = require("helmet");
 const sanitizeHtml = require("sanitize-html");
+const fs = require('fs');
 const app = express();
 const port = process.env.PORT || 3000;
 // Ajouter en haut du fichier
 const path = require("path");
 
-// Fonction de logging avec timestamp
-function logWithTimestamp(message, type = 'INFO') {
+// Configuration des logs
+const LOG_DIR = path.join(__dirname, 'logs');
+const ACCESS_LOG = path.join(LOG_DIR, 'access.log');
+const ERROR_LOG = path.join(LOG_DIR, 'error.log');
+
+// Créer le dossier de logs s'il n'existe pas
+if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR);
+}
+
+// Fonction de logging améliorée
+function logWithTimestamp(message, type = 'INFO', logFile = null) {
     const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [${type}] ${message}`;
-    console.log(logMessage);
+    const logMessage = `[${timestamp}] [${type}] ${message}\n`;
+    console.log(logMessage.trim());
+    
+    if (logFile) {
+        fs.appendFile(logFile, logMessage, (err) => {
+            if (err) console.error('Erreur d\'écriture des logs:', err);
+        });
+    }
+}
+
+// Fonction pour obtenir l'IP réelle du client
+function getClientIP(req) {
+    return req.headers['x-forwarded-for']?.split(',')[0].trim() || 
+           req.connection.remoteAddress || 
+           req.socket.remoteAddress || 
+           req.connection.socket?.remoteAddress;
 }
 
 app.use(cors({ origin: "*" }));
@@ -36,9 +61,12 @@ app.use(
 // Ajouter après app.use(express.json());
 app.use(express.static(path.join(__dirname, "../client"))); // Servir les fichiers statiques
 
-// Middleware de logging des requêtes
+// Middleware de logging des requêtes avec IP détaillée
 app.use((req, res, next) => {
-    logWithTimestamp(`${req.method} ${req.url} - IP: ${req.ip}`, 'REQUEST');
+    const ip = getClientIP(req);
+    const userAgent = req.headers['user-agent'];
+    const logMessage = `IP: ${ip} - ${req.method} ${req.url} - User-Agent: ${userAgent}`;
+    logWithTimestamp(logMessage, 'ACCESS', ACCESS_LOG);
     next();
 });
 
@@ -104,16 +132,17 @@ let allMsgs = [
 ];
 
 // Routes modifiées avec logging
-app.post('/msg/post', postLimiter, sanitizeInput, (req, res)  => {
+app.post('/msg/post', postLimiter, sanitizeInput, (req, res) => {
+    const ip = getClientIP(req);
     const { message, pseudo = "Anonyme" } = req.body;
 
     if (!message) {
-        logWithTimestamp(`Tentative d'envoi d'un message vide par ${pseudo}`, 'WARNING');
+        logWithTimestamp(`IP: ${ip} - Tentative d'envoi d'un message vide par ${pseudo}`, 'WARNING', ERROR_LOG);
         return res.status(400).json({ code: 0, error: "Message vide" });
     }
 
     if (allMsgs.length > MAX_MESSAGES) {
-        logWithTimestamp(`Limite de messages atteinte (${MAX_MESSAGES}) - Suppression du plus ancien`, 'INFO');
+        logWithTimestamp(`IP: ${ip} - Limite de messages atteinte (${MAX_MESSAGES})`, 'INFO', ACCESS_LOG);
         allMsgs.pop();
     }
 
@@ -125,24 +154,25 @@ app.post('/msg/post', postLimiter, sanitizeInput, (req, res)  => {
     };
 
     allMsgs.unshift(newMsg);
-    logWithTimestamp(`Nouveau message #${newMsg.id} créé par ${pseudo}`, 'SUCCESS');
+    logWithTimestamp(`IP: ${ip} - Nouveau message #${newMsg.id} créé par ${pseudo}`, 'SUCCESS', ACCESS_LOG);
     res.json({ code: 1, message: "Message ajouté", id: newMsg.id });
 });
 
 app.delete('/msg/del/:id', deleteLimiter, (req, res) => {
+    const ip = getClientIP(req);
     const id = parseInt(req.params.id);
     const initialLength = allMsgs.length;
     
-    logWithTimestamp(`Tentative de suppression du message #${id}`, 'INFO');
+    logWithTimestamp(`IP: ${ip} - Tentative de suppression du message #${id}`, 'INFO', ACCESS_LOG);
 
     allMsgs = allMsgs.filter((msg) => msg.id !== id);
 
     if (allMsgs.length === initialLength) {
-        logWithTimestamp(`Message #${id} non trouvé pour la suppression`, 'WARNING');
+        logWithTimestamp(`IP: ${ip} - Message #${id} non trouvé pour la suppression`, 'WARNING', ERROR_LOG);
         return res.status(404).json({ code: 0, error: "Message non trouvé" });
     }
 
-    logWithTimestamp(`Message #${id} supprimé avec succès`, 'SUCCESS');
+    logWithTimestamp(`IP: ${ip} - Message #${id} supprimé avec succès`, 'SUCCESS', ACCESS_LOG);
     res.json({ code: 1 });
 });
 
@@ -179,9 +209,11 @@ app.get("/test/*", function (req, res) {
   res.json({ msg: path });
 });
 
-// Gestion des erreurs
+// Middleware de logging des erreurs
 app.use((err, req, res, next) => {
-    logWithTimestamp(`Erreur: ${err.message}`, 'ERROR');
+    const ip = getClientIP(req);
+    const errorMessage = `IP: ${ip} - Erreur: ${err.message} - URL: ${req.url}`;
+    logWithTimestamp(errorMessage, 'ERROR', ERROR_LOG);
     res.status(500).json({ error: "Erreur serveur interne" });
 });
 
