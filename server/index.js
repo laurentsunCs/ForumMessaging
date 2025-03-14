@@ -24,6 +24,10 @@ const CONFIG = {
     DELETE: {
       windowMs: 60 * 1000, // 1 minute
       max: parseInt(process.env.DELETE_RATE_LIMIT) || 5,
+    },
+    SUBNET: {
+      windowMs: 60 * 1000, // 1 minute
+      max: 20, // Maximum de requêtes par sous-réseau
     }
   },
   SANITIZE_OPTIONS: {
@@ -34,15 +38,22 @@ const CONFIG = {
     MIN_INTERVAL_BETWEEN_MESSAGES: 1000, // 1 seconde minimum entre les messages
     MAX_SIMILAR_MESSAGES: 3, // Nombre maximum de messages similaires autorisés
     SIMILARITY_THRESHOLD: 0.8, // Seuil de similarité pour détecter les messages similaires
-    MESSAGE_HISTORY_SIZE: 100 // Taille de l'historique pour la détection de spam
+    MESSAGE_HISTORY_SIZE: 100, // Taille de l'historique pour la détection de spam
+    SUBNET_MESSAGE_LIMIT: 20, // Limite de messages par sous-réseau par minute
+    BURST_DETECTION: {
+      TIME_WINDOW: 5000, // Fenêtre de 5 secondes pour la détection de rafale
+      MAX_REQUESTS: 3 // Maximum de requêtes dans la fenêtre
+    }
   }
 };
 
-// Structure pour stocker l'historique des messages récents pour la détection de spam
+// Structure pour stocker l'historique des messages et des requêtes
 const messageHistory = {
   messages: [],
   lastMessageTimes: new Map(), // Map IP -> timestamp du dernier message
   similarityCount: new Map(), // Map contenu -> nombre d'occurrences
+  subnetRequests: new Map(), // Map sous-réseau -> compteur de requêtes
+  burstTracking: new Map(), // Map IP -> tableau de timestamps pour la détection de rafale
 };
 
 // Fonction de logging simplifiée
@@ -246,7 +257,84 @@ app.get('/config', (req, res) => {
   }
 });
 
-app.post('/msg/post', blockNonBrowser, postLimiter, sanitizeInput, async (req, res) => {
+// Fonction pour obtenir le sous-réseau d'une IP
+function getSubnet(ip) {
+  return ip.split('.').slice(0, 3).join('.');
+}
+
+// Fonction pour détecter une rafale de requêtes
+function isBurst(ip) {
+  const now = Date.now();
+  const timestamps = messageHistory.burstTracking.get(ip) || [];
+  
+  // Nettoyer les anciennes timestamps
+  const recentTimestamps = timestamps.filter(
+    ts => now - ts < CONFIG.SPAM_PROTECTION.BURST_DETECTION.TIME_WINDOW
+  );
+  
+  messageHistory.burstTracking.set(ip, recentTimestamps);
+  
+  // Vérifier si trop de requêtes dans la fenêtre de temps
+  return recentTimestamps.length >= CONFIG.SPAM_PROTECTION.BURST_DETECTION.MAX_REQUESTS;
+}
+
+// Fonction pour vérifier les limites du sous-réseau
+function checkSubnetLimits(ip) {
+  const subnet = getSubnet(ip);
+  const now = Date.now();
+  
+  if (!messageHistory.subnetRequests.has(subnet)) {
+    messageHistory.subnetRequests.set(subnet, {
+      count: 0,
+      lastReset: now
+    });
+  }
+  
+  const subnetData = messageHistory.subnetRequests.get(subnet);
+  
+  // Réinitialiser le compteur si la fenêtre est passée
+  if (now - subnetData.lastReset >= CONFIG.RATE_LIMITS.SUBNET.windowMs) {
+    subnetData.count = 0;
+    subnetData.lastReset = now;
+  }
+  
+  subnetData.count++;
+  
+  return subnetData.count > CONFIG.SPAM_PROTECTION.SUBNET_MESSAGE_LIMIT;
+}
+
+// Middleware de protection contre les attaques distribuées
+const subnetProtection = (req, res, next) => {
+  const ip = getClientIP(req);
+  const subnet = getSubnet(ip);
+  
+  // Vérifier les limites du sous-réseau
+  if (checkSubnetLimits(ip)) {
+    logWithTimestamp(`Limite de sous-réseau dépassée - Subnet: ${subnet}`, 'WARNING');
+    return res.status(429).json({ 
+      code: 0, 
+      error: "Trop de requêtes depuis votre réseau" 
+    });
+  }
+  
+  // Vérifier les rafales de requêtes
+  if (isBurst(ip)) {
+    logWithTimestamp(`Rafale de requêtes détectée - IP: ${ip}`, 'WARNING');
+    return res.status(429).json({ 
+      code: 0, 
+      error: "Trop de requêtes en peu de temps" 
+    });
+  }
+  
+  // Ajouter le timestamp pour la détection de rafale
+  const timestamps = messageHistory.burstTracking.get(ip) || [];
+  timestamps.push(Date.now());
+  messageHistory.burstTracking.set(ip, timestamps);
+  
+  next();
+};
+
+app.post('/msg/post', blockNonBrowser, subnetProtection, postLimiter, sanitizeInput, async (req, res) => {
   try {
     const ip = getClientIP(req);
     const { message, pseudo = "Anonyme" } = req.body;
