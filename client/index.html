@@ -1,48 +1,84 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Forum de discussion en temps réel">
+    <meta name="theme-color" content="#3498db">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Forum de Discussion</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Préchargement du script pour améliorer les performances -->
+    <link rel="preload" href="script.js" as="script">
+    <!-- Protection contre le clickjacking -->
+    <style>
+        body {
+            display: none;
+        }
+    </style>
 </head>
+
 <body>
     <div class="container">
-        <header>
+        <header role="banner">
             <h1>Forum de Discussion</h1>
             <div class="header-buttons">
-                <button id="refreshButton" class="refresh-button">
-                    <span class="refresh-icon">🔄</span>
+                <button id="refreshButton" class="refresh-button" aria-label="Rafraîchir les messages"
+                    title="Rafraîchir">
+                    <span class="refresh-icon" aria-hidden="true">🔄</span>
                 </button>
-                <button id="themeToggle" class="theme-toggle">
-                    <span class="theme-icon">🌙</span>
+                <button id="themeToggle" class="theme-toggle" aria-label="Changer le thème" title="Changer le thème">
+                    <span class="theme-icon" aria-hidden="true">🌙</span>
                 </button>
             </div>
         </header>
-        
-        <main class="main-content">
-            <div class="messages-section">
+
+        <main class="main-content" role="main">
+            <section class="messages-section" aria-label="Liste des messages">
                 <div class="messages-header">
                     <h2>Messages</h2>
-                    <div class="message-counter">
+                    <div class="message-counter" aria-live="polite">
                         Total: <span id="messageCount">0</span> messages
                     </div>
                 </div>
-                <div class="messages-container" id="messagesContainer">
+                <div class="messages-container" id="messagesContainer" role="log" aria-live="polite">
                     <!-- Les messages seront injectés ici dynamiquement -->
                 </div>
-            </div>
+            </section>
 
-            <div class="form-section">
+            <section class="form-section" aria-label="Formulaire de message">
                 <h2>Nouveau Message</h2>
-                <div class="message-form">
-                    <input type="text" id="pseudo" placeholder="Votre pseudo" maxlength="20">
-                    <textarea id="message" placeholder="Votre message..." maxlength="500"></textarea>
-                    <button id="sendButton">Envoyer</button>
-                </div>
-            </div>
+                <form class="message-form" id="messageForm">
+                    <div class="form-group">
+                        <label for="pseudo">Pseudo</label>
+                        <input type="text" id="pseudo" name="pseudo" placeholder="Votre pseudo" maxlength="20" required
+                            autocomplete="nickname" aria-required="true">
+                    </div>
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" placeholder="Votre message..." maxlength="500" required
+                            aria-required="true"></textarea>
+                    </div>
+                    <button type="submit" id="sendButton" disabled>Envoyer</button>
+                </form>
+            </section>
         </main>
+
+        <footer role="contentinfo">
+            <p>© 2025 Forum de Discussion - Tous droits réservés</p>
+        </footer>
     </div>
-    <script src="/script.js"></script>
+
+    <!-- Protection contre le clickjacking -->
+    <script>
+        if (self === top) {
+            document.body.style.display = 'block';
+        } else {
+            top.location = self.location;
+        }
+    </script>
+    <script src="script.js" defer></script>
 </body>
-</html> 
+
+</html>

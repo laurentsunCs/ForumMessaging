@@ -50,7 +50,6 @@ async function refreshMessages() {
 
   try {
     const response = await fetch(`${API_URL}/msg/getAll`);
-    console.log("La réponse est : ", response);
     if (!response.ok) {
       console.warn('Serveur non disponible');
       return;
@@ -149,68 +148,68 @@ function checkFields() {
 
 // Fonction pour mettre à jour le texte du bouton avec le décompte
 function updateSendButtonText(seconds) {
-    if (seconds > 0) {
-        sendButton.textContent = `Attendre (${seconds}s)`;
-    } else {
-        sendButton.textContent = 'Envoyer';
-    }
+  if (seconds > 0) {
+    sendButton.textContent = `Attendre (${seconds}s)`;
+  } else {
+    sendButton.textContent = 'Envoyer';
+  }
 }
 
 // Fonction pour envoyer un message
 async function sendMessage(e) {
-    e.preventDefault();
+  e.preventDefault();
 
-    isSendCooldown = true;
-    let countdown = 5;
-    
-    // Démarrer le décompte
-    const countdownInterval = setInterval(() => {
-        countdown--;
-        updateSendButtonText(countdown);
-        if (countdown <= 0) {
-            clearInterval(countdownInterval);
-            isSendCooldown = false;
-            checkFields();
-        }
-    }, 1000);
+  isSendCooldown = true;
+  let countdown = 5;
 
-    checkFields();
+  // Démarrer le décompte
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    updateSendButtonText(countdown);
+    if (countdown <= 0) {
+      clearInterval(countdownInterval);
+      isSendCooldown = false;
+      checkFields();
+    }
+  }, 1000);
 
-    const pseudo = pseudoInput.value.trim();
-    const content = messageInput.value.trim();
+  checkFields();
 
-    if (!pseudo || !content) {
-        showFeedback("Veuillez remplir tous les champs", true);
-        return;
+  const pseudo = pseudoInput.value.trim();
+  const content = messageInput.value.trim();
+
+  if (!pseudo || !content) {
+    showFeedback("Veuillez remplir tous les champs", true);
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/msg/post`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: content, pseudo })
+    });
+
+    if (response.status === 429) {
+      showFeedback("Attendez 1 minute entre les messages", true);
+      return;
+    }
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || "Erreur serveur");
     }
 
-    try {
-        const response = await fetch(`${API_URL}/msg/post`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: content, pseudo })
-        });
-
-        if (response.status === 429) {
-            showFeedback("Attendez 1 minute entre les messages", true);
-            return;
-        }
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || "Erreur serveur");
-        }
-
-        showFeedback("Message envoyé !");
-        messageInput.value = "";
-        userHasScrolled = false; // Réinitialiser le flag de défilement
-        await refreshMessages();
-    } catch (error) {
-        if (error.message.includes("429")) {
-            showFeedback("Limite de messages atteinte - Patientez", true);
-        } else {
-            showFeedback(error.message || "Échec de l'envoi", true);
-        }
+    showFeedback("Message envoyé !");
+    messageInput.value = "";
+    userHasScrolled = false; // Réinitialiser le flag de défilement
+    await refreshMessages();
+  } catch (error) {
+    if (error.message.includes("429")) {
+      showFeedback("Limite de messages atteinte - Patientez", true);
+    } else {
+      showFeedback(error.message || "Échec de l'envoi", true);
     }
+  }
 }
 
 function updateDeleteButtons() {
