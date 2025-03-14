@@ -41,6 +41,24 @@ function getClientIP(req) {
     req.connection.socket?.remoteAddress;
 }
 
+// Fonction pour vérifier si le User-Agent est un navigateur
+function isBrowserUserAgent(userAgent) {
+  if (!userAgent) return false;
+  return userAgent.includes('Mozilla/') || userAgent.includes('Chrome/') || 
+         userAgent.includes('Safari/') || userAgent.includes('Firefox/') || 
+         userAgent.includes('Edge/');
+}
+
+// Middleware pour bloquer les requêtes non-navigateur
+const blockNonBrowser = (req, res, next) => {
+  const userAgent = req.get('User-Agent');
+  if (!isBrowserUserAgent(userAgent)) {
+    logWithTimestamp(`Tentative d'accès bloquée - IP: ${getClientIP(req)} - User-Agent: ${userAgent}`, 'WARNING');
+    return res.status(403).json({ code: 0, error: "Accès non autorisé" });
+  }
+  next();
+};
+
 // Configuration des middlewares
 app.use(cors({ origin: "*" }));
 app.use(express.json());
@@ -74,7 +92,8 @@ const postLimiter = rateLimit({
     code: 0,
     error: "Trop de tentatives. Merci de patienter 1 minute."
   },
-  skipSuccessfulRequests: true
+  skipSuccessfulRequests: false, // Ne pas ignorer les requêtes réussies
+  keyGenerator: (req) => `${getClientIP(req)}_post` // Utiliser l'IP comme clé
 });
 
 const deleteLimiter = rateLimit({
@@ -129,7 +148,7 @@ let allMsgs = [
 ];
 
 // Routes avec gestion d'erreurs améliorée
-app.post('/msg/post', postLimiter, sanitizeInput, async (req, res) => {
+app.post('/msg/post', blockNonBrowser, postLimiter, sanitizeInput, async (req, res) => {
   try {
     const ip = getClientIP(req);
     const { message, pseudo = "Anonyme" } = req.body;
