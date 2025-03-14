@@ -199,6 +199,15 @@ header h1 {
     box-shadow: 0 4px 15px var(--shadow-color);
     transition: all 0.3s ease;
 }
+.message.new {
+    border-left: 4px solid var(--header-color);
+    animation: fadeIn 0.5s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
 
 .message:hover {
     transform: translateY(-3px);
@@ -324,6 +333,10 @@ header h1 {
 
 .message-form button:active {
     transform: translateY(0);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (max-width: 1024px) {

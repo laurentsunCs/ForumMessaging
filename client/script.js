@@ -41,37 +41,41 @@ function updateMessageCount() {
 
 // Fonction pour rafraîchir les messages
 async function refreshMessages() {
-  if (isRefreshing) return;
-  isRefreshing = true;
-  refreshButton.classList.add("loading");
-  
-  try {
-    const response = await fetch(`${API_URL}/msg/getAll`);
-    if (!response.ok) {
-      console.warn('Serveur non disponible');
-      return;
+    if (isRefreshing) return;
+    isRefreshing = true;
+    refreshButton.classList.add("loading");
+    
+    try {
+        const response = await fetch(`${API_URL}/msg/getAll`);
+        console.log("La réponse est : ", response);
+        if (!response.ok) {
+            console.warn('Serveur non disponible');
+            return;
+        }
+        
+        const newMessages = await response.json();
+        messages = (newMessages || []).sort((a, b) => 
+          new Date(b.date) - new Date(a.date)
+        );
+        
+        // Mettre à jour l'affichage
+        messagesContainer.innerHTML = '';
+        messages.forEach(message => {
+            const messageElement = createMessageElement(message);
+            messagesContainer.appendChild(messageElement);
+        });
+        
+        updateMessageCount();
+    } catch (error) {
+        console.log("L'erreur est : ", error);
+        console.warn("Serveur non disponible");
+        messages = [];
+        messagesContainer.innerHTML = '<div class="message-error">Serveur non disponible</div>';
+        updateMessageCount();
+    } finally {
+        refreshButton.classList.remove("loading");
+        isRefreshing = false;
     }
-    
-    const newMessages = await response.json();
-    messages = newMessages || [];
-    
-    // Mettre à jour l'affichage
-    messagesContainer.innerHTML = '';
-    messages.forEach(message => {
-      const messageElement = createMessageElement(message);
-      messagesContainer.appendChild(messageElement);
-    });
-    
-    updateMessageCount();
-  } catch (error) {
-    console.warn("Serveur non disponible");
-    messages = [];
-    messagesContainer.innerHTML = '<div class="message-error">Serveur non disponible</div>';
-    updateMessageCount();
-  } finally {
-    refreshButton.classList.remove("loading");
-    isRefreshing = false;
-  }
 }
 
 
@@ -88,7 +92,10 @@ function showFeedback(message, isError = false) {
 function createMessageElement(message) {
   const messageDiv = document.createElement("div");
   messageDiv.className = "message";
-  
+  if (new Date() - new Date(message.date) < 60000) { // Messages de moins d'1 minute
+    messageDiv.classList.add('new');
+  }
+
   const header = document.createElement("div");
   header.className = "message-header";
   
@@ -111,6 +118,7 @@ function createMessageElement(message) {
   
   header.append(pseudo, date);
   messageDiv.append(header, content, deleteBtn);
+  
   return messageDiv;
 }
 
@@ -135,34 +143,35 @@ function checkFields() {
 
 // Fonction pour envoyer un message
 async function sendMessage(e) {
-  e.preventDefault();
-  
-  const pseudo = pseudoInput.value.trim();
-  const content = messageInput.value.trim();
-  
-  if (!pseudo || !content) {
-    showFeedback("Veuillez remplir tous les champs", true);
-    return;
-  }
-  
-  try {
-    const response = await fetch(`${API_URL}/msg/post`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: content, pseudo })
-    });
+    e.preventDefault();
     
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || "Erreur serveur");
+    const pseudo = pseudoInput.value.trim();
+    const content = messageInput.value.trim();
+    
+    if (!pseudo || !content) {
+        showFeedback("Veuillez remplir tous les champs", true);
+        return;
     }
     
-    showFeedback("Message envoyé !");
-    messageInput.value = "";
-    await refreshMessages();
-  } catch (error) {
-    showFeedback(error.message || "Échec de l'envoi", true);
-  }
+    try {
+        const response = await fetch(`${API_URL}/msg/post`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: content, pseudo })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || "Erreur serveur");
+        }
+        
+        showFeedback("Message envoyé !");
+        messageInput.value = "";
+        userHasScrolled = false; // Réinitialiser le flag de défilement
+        await refreshMessages();
+    } catch (error) {
+        showFeedback(error.message || "Échec de l'envoi", true);
+    }
 }
 
 // Fonction pour supprimer un message

@@ -5,14 +5,19 @@ const helmet = require("helmet");
 const sanitizeHtml = require("sanitize-html");
 const app = express();
 const port = process.env.PORT || 3000;
+// Ajouter en haut du fichier
+const path = require('path');
+
+app.use(cors({ origin: '*' }));
+app.use(express.json());
+app.use(helmet());
+// Ajouter après app.use(express.json());
+app.use(express.static(path.join(__dirname, '../client'))); // Servir les fichiers statiques
 
 // Configuration
 const MAX_MESSAGES = process.env.MAX_MESSAGES || 100;
 let lastId = 2; // ID incrémental
 
-app.use(cors());
-app.use(express.json());
-app.use(helmet());
 
 // Middleware de sanitization
 const sanitizeInput = (req, res, next) => {
@@ -34,8 +39,8 @@ app.post("/msg/post", sanitizeInput, (req, res) => {
   
   if (!message) return res.status(400).json({ code: 0, error: "Message vide" });
 
-  if (allMsgs.length >= MAX_MESSAGES) {
-    allMsgs.shift();
+  if(allMsgs.length > MAX_MESSAGES) {
+    allMsgs.pop(); // Supprimer le plus ancien
   }
 
   const newMsg = {
@@ -45,7 +50,7 @@ app.post("/msg/post", sanitizeInput, (req, res) => {
     date: new Date().toISOString(),
   };
 
-  allMsgs.push(newMsg);
+  allMsgs.unshift(newMsg);
   res.json({ code: 1, message: "Message ajouté", id: newMsg.id });
 });
 
@@ -73,12 +78,12 @@ app.get("/msg/get/:id", (req, res) => {
 
 // Route pour obtenir tous les messages
 app.get("/msg/getAll", (req, res) => {
-  // Réindexer les IDs pour s'assurer qu'ils sont consécutifs
-  allMsgs = allMsgs.map((msg, index) => ({
-    ...msg,
-    id: index
-  }));
-  res.json(allMsgs);
+  // Trier les messages par date décroissante
+  const sortedMessages = [...allMsgs].sort((a, b) => 
+    new Date(b.date) - new Date(a.date)
+  );
+  
+  res.json(sortedMessages);
 });
 
 // Route pour obtenir le nombre de messages
@@ -86,6 +91,9 @@ app.get("/msg/nber", (req, res) => {
   res.json(allMsgs.length);
 });
 
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/index.html'));
+});
 
 // Route de test
 app.get("/test/*", function (req, res) {
@@ -95,5 +103,5 @@ app.get("/test/*", function (req, res) {
 
 // Démarrage du serveur
 app.listen(port, () => {
-  console.log(`Serveur démarré sur le port ${port}`);
+  console.log(`l'Application est démarrée sur le port ${port}, accéder à http://localhost:${port}`);
 });

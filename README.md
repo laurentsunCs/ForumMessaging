@@ -1,40 +1,103 @@
-# Application de Messagerie Web
+# Forum de Discussion Web
 
-Forum de discussion simple et moderne.
+[![Déployé sur Render](https://img.shields.io/badge/Render-%46E3B7.svg?logo=render&logoColor=white)](https://votre-application.onrender.com)
 
-## Installation
+Application de messagerie avec gestion de thème et modération
 
-1. Cloner le projet
-2. Installer les dépendances :
-```bash
-cd server && npm install
+## 🚀 Déploiement
+
+L'application est déployée sur Render :  
+**URL de production** : [https://votre-application.onrender.com](https://votre-application.onrender.com)
+
+## 💻 Développement local
+
+### Prérequis
+- Node.js v18+
+- Navigateur moderne
+
+### Structure du projet
 ```
-3. Copier `.env.example` en `.env` :
+.
+├── client/
+│   ├── index.html
+│   ├── styles.css
+│   └── script.js
+│
+├── server/
+│   ├── index.js
+│   ├── package.json
+│   └── package-lock.json
+│
+├── .vscode/
+├── README.md
+├── Rapport.md
+├── .env
+├── .env.example
+└── .gitignore
+```
+
+### Installation
+1. Cloner le dépôt
+```bash
+git clone https://github.com/votre-utilisateur/forum-web.git
+cd forum-web
+```
+
+2. Installer les dépendances
+```bash
+npm install
+```
+
+3. Configurer l'environnement
 ```bash
 cp .env.example .env
 ```
 
-## Lancement
-
-1. Démarrer le serveur :
+### Lancer l'application
 ```bash
-cd server && npm start
+npm start
 ```
 
-2. Ouvrir `client/index.html` dans un navigateur
+L'application sera accessible sur : [http://localhost:3000](http://localhost:3000)
 
-## Utilisation
-
-- **Messages** : Écrire et envoyer des messages avec un pseudo
-- **Actualisation** : Automatique (30s) ou manuelle via le bouton
-- **Thème** : Basculer entre mode clair/sombre
-- **Suppression** : Bouton sous chaque message
-
-## Configuration
+## ⚙️ Configuration
 
 Fichier `.env` :
+```env
+PORT=3000
+MAX_MESSAGES=150
+NODE_ENV=development
 ```
-PORT=5555              # Port du serveur
-HOST=localshot         # Host du serveur
-MAX_MESSAGES=100       # Limite de messages
-``` 
+
+## 📚 Utilisation
+
+### Fonctionnalités
+- ✍️ Création de messages avec pseudo
+- 🗑️ Suppression de messages
+- 🔄 Actualisation automatique (30s)
+- 🌗 Thème clair/sombre persistant
+- 📱 Interface responsive
+- 💬 Feedback utilisateur temps réel
+
+### Commandes utiles
+| Commande | Description |
+|----------|-------------|
+| `npm start` | Lance le serveur de production |
+| `npm run dev` | Lance le serveur en mode développement |
+| `npm test` | (À venir) Exécute les tests unitaires |
+
+## 🌍 Déploiement
+
+### Sur Render.com
+1. Créer un nouveau "Web Service"
+2. Connecter le dépôt GitHub
+3. Configurer :
+   - **Build Command** : `npm install`
+   - **Start Command** : `npm start`
+4. Ajouter les variables d'environnement :
+   ```env
+   PORT=10000
+   MAX_MESSAGES=150
+   NODE_ENV=production
+   ```
+5. Déployer !
