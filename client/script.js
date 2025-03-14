@@ -162,7 +162,6 @@ async function sendMessage(e) {
 
     isSendCooldown = true;
     let countdown = 5;
-    updateSendButtonText(countdown);
     
     // Démarrer le décompte
     const countdownInterval = setInterval(() => {

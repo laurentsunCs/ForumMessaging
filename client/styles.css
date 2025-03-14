@@ -332,7 +332,6 @@ header h1 {
   }
   
   .message-form button:disabled::after {
-    content: " (5s)";
     font-size: 0.8em;
   }
 
