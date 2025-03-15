@@ -52,7 +52,6 @@
 
 #### **Déploiement**
 
-- **Lien de Démo** : [https://forum-discussion-example.glitch.me](https://forum-discussion-example.glitch.me)  
 - **Code Source** : [GitHub Repository](https://github.com/laurentsunCs/ForumMessaging)  
 - **Replit** : [https://forummessaging.onrender.com/](https://forummessaging.onrender.com/)
 
