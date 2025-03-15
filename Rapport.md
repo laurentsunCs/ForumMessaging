@@ -1,142 +1,73 @@
-
-# Rapport Final : Forum de Discussion Sécurisé
-
-## 🌟 Introduction
-**Objectif** : Créer une plateforme de discussion moderne, sécurisée et performante, permettant aux utilisateurs d'échanger en temps réel tout en garantissant une protection contre les menaces courantes.
-
-**Lien de Production** : [https://forummessaging.onrender.com](https://forummessaging.onrender.com)  
-**Stack Technique** : Node.js/Express (backend), HTML/CSS/JS (frontend), Render (hébergement).
+### Rapport Technique : Forum de Discussion
 
 ---
 
-## 🏗 Architecture du Projet
-### Structure des Fichiers
-```plaintext
-.
+#### **Structure du Projet**
+```
 ├── client/              # Interface utilisateur
-│   ├── index.html
-│   ├── styles.css
-│   └── script.js
-├── server/              # Logique backend
-│   ├── index.js
-│   ├── package.json
-│   └── .env
-└── .gitignore           # Exclusion des fichiers sensibles
+│   ├── index.html       # Structure HTML avec protection anti-clickjacking
+│   ├── styles.css       # Styles CSS avec thème clair/sombre
+│   └── script.js        # Logique client (envoi/suppression de messages)
+├── server/              # Backend
+│   ├── index.js         # Serveur Express avec sécurité et gestion des messages
+│   ├── package.json     # Dépendances (express, helmet, etc.)
+│   └── .env             # Variables d'environnement (PORT, limites, etc.)
+└── .gitignore           # Exclusion des fichiers sensibles (node_modules, .env)
 ```
 
-### Technologies Clés
-| Catégorie       | Outils                                                |
-|-----------------|-------------------------------------------------------|
-| **Frontend**    | HTML5, CSS3 (Variables CSS), JavaScript ES6          |
-| **Backend**     | Node.js, Express.js, Helmet, express-rate-limit      |
-| **Sécurité**    | sanitize-html, CSP, Journalisation avancée           |
-| **Déploiement** | Render (HTTPS automatique), gestion des variables d'environnement |
+---
+
+#### **Choix Techniques**
+
+1. **Stockage des Messages**  
+   - **Structure de données** : Tableau d'objets en mémoire (`allMsgs`).  
+     Exemple :
+     ```javascript
+     {
+       id: 2,
+       msg: "CentraleSupelec Forever",
+       pseudo: "Étudiant",
+       date: "2023-10-20T12:34:56Z"
+     }
+     ```
+   - **Limite** : Les messages sont perdus au redémarrage du serveur (choisi pour la simplicité).
+
+2. **Sécurité**  
+   - **Sanitisation** : `sanitize-html` pour bloquer les balises HTML.  
+   - **Protection DDoS** :  
+     - Rate limiting par sous-réseau (`SUBNET_MESSAGE_LIMIT: 20/min`).  
+     - Détection de rafales (`BURST_DETECTION: 3 requêtes/5s`).  
+   - **En-têtes** : Helmet pour CSP, COEP, et désactivation de X-Powered-By.  
+   - **Anti-Spam** : Vérification des messages similaires (seuil de 80%) et intervalle minimal entre les messages (1s).
+
+3. **Performance**  
+   - **Auto-rafraîchissement** : Toutes les 30 secondes côté client.  
+   - **Préchargement** : Scripts et styles optimisés pour le chargement.
+
+4. **Accessibilité**  
+   - Rôles ARIA (`role="main"`, `aria-live`).  
+   - Thème clair/sombre avec persistance en `localStorage`.
 
 ---
 
-## 🚀 Fonctionnalités Principales
-### Côté Client
-- **Thèmes Dynamiques** : Basculer entre mode clair/sombre (stockage local).
-- **Anti-Spam** : Cooldown de 5s après l'envoi d'un message.
-- **Feedback Utilisateur** : Toasts animés pour les succès/erreurs.
-- **Responsive Design** : Adapté à tous les écrans (mobile, tablette, desktop).
+#### **Déploiement**
 
-### Côté Serveur
-- **Gestion des Messages** :  
-  → Création, suppression, récupération.  
-  → Limite de `MAX_MESSAGES` (configurable via `.env`).  
-  → Tri par date (plus récents en premier).
-- **Rate Limiting** :  
-  → **POST** : 5 requêtes/minute.  
-  → **DELETE** : 5 requêtes/minute.
+- **Lien de Démo** : [https://forum-discussion-example.glitch.me](https://forum-discussion-example.glitch.me)  
+- **Code Source** : [GitHub Repository](https://github.com/laurentsunCs/ForumMessaging)  
+- **Replit** : [https://forummessaging.onrender.com/](https://forummessaging.onrender.com/)
 
 ---
 
-## 🔐 Mesures de Sécurité
-### Protections Actives
-| Mesure                          | Description                                                                 |
-|---------------------------------|-----------------------------------------------------------------------------|
-| **Sanitisation des Entrées**    | Neutralisation des balises HTML avec `sanitize-html` (config strict : aucune balise/autorisation). |
-| **Blocage des Robots**          | Middleware `blockNonBrowser` pour rejeter les User-Agent non-navigateurs.  |
-| **Clickjacking Protection**     | Header `X-Frame-Options` via Helmet + vérification JavaScript.             |
-| **Limites de Taille**           | Corps des requêtes limité à 1 Mo pour prévenir les attaques par surcharge. |
+#### **Améliorations Possibles**
 
-### Journalisation Avancée
-- **Niveaux de Log** : `ACCESS`, `WARNING`, `ERROR`, `SUCCESS`.  
-- **Exemple** :  
-  `[2024-02-15T10:00:00Z] [WARNING] IP: 192.168.1.1 - Tentative de message trop long`.
-
-### Sécurité des En-têtes
-- **Content Security Policy (CSP)** :  
-  ```javascript
-  scriptSrc: ["'self'", "'unsafe-inline'"], // Autorise les scripts internes uniquement
-  imgSrc: ["'self'", "data:"]
-  ```
+- **Base de données** : Remplacer le stockage en mémoire par PostgreSQL/MongoDB.  
+- **Authentification** : Ajouter un système de connexion avec JWT.  
+- **WebSockets** : Rafraîchissement en temps réel via Socket.IO.  
+- **Tests** : Implémenter des tests unitaires avec Jest.
 
 ---
 
-## 📊 Données Techniques
-### Structure des Messages
-```javascript
-{
-  id: number (auto-incrémenté),
-  msg: string (sanitisé, max 500 caractères),
-  pseudo: string (sanitisé, max 20 caractères),
-  date: string (ISO 8601)
-}
-```
+#### **Aperçu**
 
-### Performances
-- **Temps de Réponse Moyen** : < 300 ms.  
-- **Limites Configurables** :  
-  ```env
-  MAX_MESSAGES=50       # Nombre max de messages stockés
-  PORT=3000             # Port du serveur
-  ```
-
----
-
-## 🛠 Déploiement
-### Étapes d'Installation
-1. Cloner le dépôt :
-   ```bash
-   git clone https://github.com/votre-repo/forum.git
-   ```
-2. Configurer `.env` :
-   ```env
-   PORT=3000
-   MAX_MESSAGES=50
-   ```
-3. Installer les dépendances :
-   ```bash
-   cd server && npm install
-   ```
-4. Démarrer le serveur :
-   ```bash
-   node index.js
-   ```
-
-### Environnement de Production
-- **Hébergeur** : Render (infrastructure gérée, SSL/TLS intégré).  
-- **Monitoring** : Logs temps réel, redémarrage automatique en cas d'erreur.
-
----
-
-## 📈 Résultats et Perspectives
-### Bilan
-- **Robustesse** : Aucune vulnérabilité critique détectée (tests manuels et outils comme OWASP ZAP).  
-- **Utilisabilité** : Interface intuitive, temps de réponse optimisé.
-
-### Améliorations Futures
-1. **Base de Données** : Remplacer le stockage en mémoire par PostgreSQL pour la persistance.  
-2. **Authentification** : Ajout de connexion sécurisée avec JWT.  
-3. **WebSockets** : Rafraîchissement en temps réel via Socket.IO.  
-4. **Tests E2E** : Implémentation de tests Cypress pour valider les flux critiques.
-
----
-
-## 📞 Conclusion
-Ce projet démontre une implémentation complète d'un forum moderne, alliant performance, convivialité et sécurité. Les mesures mises en place (sanitisation, rate-limiting, CSP) en font une base solide pour des extensions futures.  
-
-**Accéder au forum** : [https://forummessaging.onrender.com](https://forummessaging.onrender.com)  
-**Code Source** : [GitHub](https://github.com/votre-repo) *(Lien personnalisable)*
+![Capture d'écran du forum](https://via.placeholder.com/800x600.png?text=Forum+de+Discussion)  
+*Interface utilisateur avec thème sombre et messages dynamiques.*
