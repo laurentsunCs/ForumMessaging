@@ -90,11 +90,9 @@ DELETE_RATE_LIMIT=5     # Nombre maximum de suppressions par minute
 
 ### Limites et Sécurité
 - 🛡️ Protection contre le spam :
-  - Maximum 10 messages par minute par utilisateur
-  - Maximum 20 messages par minute par sous-réseau
-  - Délai minimum de 1 seconde entre les messages
-  - Maximum 3 messages similaires autorisés
-  - Maximum 3 requêtes en 5 secondes (anti-burst)
+  - Maximum 5 messages par minute par utilisateur
+  - Délai minimum de 5 seconde entre les messages
+  - Maximum 3 messages similaires autorisés par minute
 - 📝 Limites des messages :
   - Maximum 500 caractères par message
   - Maximum 30 caractères pour le pseudo
